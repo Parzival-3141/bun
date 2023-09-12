@@ -602,7 +602,8 @@ pub const Version = extern struct {
     major: u32 = 0,
     minor: u32 = 0,
     patch: u32 = 0,
-    _tag_padding: [4]u8 = .{0} ** 4, // [see padding_checker.zig]
+    /// [see `padding_checker.zig`]
+    _tag_padding: [4]u8 = .{0} ** 4,
     tag: Tag = .{},
     // raw: RawType = RawType{},
 
@@ -1920,6 +1921,12 @@ pub const Query = struct {
                     }
                     try list.andRange(token.toRange(parse_result.version));
                 } else if (is_or) {
+                    if (token.tag == .none) {
+                        is_or = false;
+                        token.wildcard = .none;
+                        prev_token.tag = .none;
+                        continue;
+                    }
                     try list.orRange(token.toRange(parse_result.version));
                 } else {
                     try list.andRange(token.toRange(parse_result.version));
