@@ -4659,53 +4659,7 @@ pub const NodeFS = struct {
     pub fn rm(this: *NodeFS, args: Arguments.RmDir, comptime flavor: Flavor) Maybe(Return.Rm) {
         _ = flavor;
 
-        if (comptime Environment.isMac) {
-            var path = args.path.sliceZ(&this.sync_error_buf);
-
-            while (true) {
-                var flags = bun.C.darwin.RemoveFileFlags{
-                    .recursive = args.recursive,
-                    .cross_mount = args.recursive,
-                    .allow_long_paths = args.recursive,
-                };
-
-                if (Maybe(Return.Rm).errnoSysP(bun.C.darwin.removefileat(std.os.AT.FDCWD, path, null, flags), .unlink, path)) |errno| {
-                    switch (@as(os.E, @enumFromInt(errno.err.errno))) {
-                        .AGAIN, .INTR => continue,
-                        .NOENT => {
-                            if (args.force) {
-                                return Maybe(Return.Rm).success;
-                            }
-
-                            return errno;
-                        },
-
-                        .MLINK => {
-                            var copy: [bun.MAX_PATH_BYTES]u8 = undefined;
-                            @memcpy(copy[0..path.len], path);
-                            copy[path.len] = 0;
-                            var dest_copy = copy[0..path.len :0];
-                            switch (Syscall.unlink(dest_copy).getErrno()) {
-                                .AGAIN, .INTR => continue,
-                                .NOENT => {
-                                    if (args.force) {
-                                        continue;
-                                    }
-
-                                    return errno;
-                                },
-                                .SUCCESS => continue,
-                                else => return errno,
-                            }
-                        },
-                        .SUCCESS => unreachable,
-                        else => return errno,
-                    }
-                }
-
-                return Maybe(Return.Rm).success;
-            }
-        } else if (comptime Environment.isLinux or Environment.isWindows) {
+        if (comptime Environment.isMac or Environment.isLinux or Environment.isWindows) {
             if (args.recursive) {
                 std.fs.cwd().deleteTree(args.path.slice()) catch |err| {
                     const errno: E = switch (err) {
