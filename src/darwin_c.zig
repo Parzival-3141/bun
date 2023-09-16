@@ -140,8 +140,8 @@ pub extern "c" fn clonefile(src: [*:0]const u8, dest: [*:0]const u8, flags: c_in
 //     };
 // }
 
-// benchmarking this did nothing on macOS
-// i verified it wasn't returning -1
+/// benchmarking this did nothing on macOS
+/// i verified it wasn't returning -1
 pub fn preallocate_file(_: os.fd_t, _: off_t, _: off_t) !void {
     //     pub const struct_fstore = extern struct {
     //     fst_flags: c_uint,
@@ -483,8 +483,8 @@ pub const kFSEventStreamEventFlagUnmount: c_int = 128;
 pub const kFSEventStreamEventFlagUserDropped: c_int = 2;
 
 pub fn getFreeMemory() u64 {
-    // NOT IMPLEMENTED YET
-    return 1024 * 1024;
+    @panic("NOT IMPLEMENTED YET\n");
+    // return 1024 * 1024;
 }
 
 pub fn getTotalMemory() u64 {
@@ -728,28 +728,29 @@ const IO_CTL_RELATED = struct {
 
 pub usingnamespace IO_CTL_RELATED;
 
-pub const RemoveFileFlags = struct {
+pub const RemoveFileFlags = packed struct(u32) {
     /// If path is a directory, recurse (depth first traversal)
-    pub const recursive: u32 = (1 << 0);
+    recursive: bool = false,
     /// Remove contents but not directory itself
-    pub const keep_parent: u32 = (1 << 1);
+    keep_parent: bool = false,
     /// 7 pass DoD algorithm
-    pub const secure_7_pass: u32 = (1 << 2);
-    /// 35-pass Gutmann algorithm (overrides REMOVEFILE_SECURE_7_PASS)
-    pub const secure_35_pass: u32 = (1 << 3);
+    secure_7_pass: bool = false,
+    /// 35-pass Gutmann algorithm (overrides `secure_7_pass`)
+    secure_35_pass: bool = false,
     /// 1 pass single overwrite),
-    pub const secure_1_pass: u32 = (1 << 4);
+    secure_1_pass: bool = false,
     /// 3 pass overwrite
-    pub const secure_3_pass: u32 = (1 << 5);
+    secure_3_pass: bool = false,
     /// Single-pass overwrite, with 0 instead of random data
-    pub const secure_1_pass_zero: u32 = (1 << 6);
-    /// Cross mountpoints when deleting recursively. << 6),
-    pub const cross_mount: u32 = (1 << 7);
+    secure_1_pass_zero: bool = false,
+    /// Cross mountpoints when deleting recursively.
+    cross_mount: bool = false,
     /// Paths may be longer than PATH_MAX - requires temporarily changing cwd
-    pub const allow_long_paths: u32 = (1 << 8);
+    allow_long_paths: bool = false,
+    _reserved: u23 = 0,
 };
 pub const removefile_state_t = opaque {};
-pub extern fn removefileat(fd: c_int, path: [*c]const u8, state: ?*removefile_state_t, flags: u32) c_int;
+pub extern fn removefileat(fd: c_int, path: [*c]const u8, state: ?*removefile_state_t, flags: RemoveFileFlags) c_int;
 
 // As of Zig v0.11.0-dev.1393+38eebf3c4, ifaddrs.h is not included in the headers
 pub const ifaddrs = extern struct {

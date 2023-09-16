@@ -4579,22 +4579,24 @@ pub const NodeFS = struct {
 
         if (comptime Environment.isMac) {
             if (args.recursive) {
-                var dest = args.path.sliceZ(&this.sync_error_buf);
+                var path = args.path.sliceZ(&this.sync_error_buf);
 
-                var flags: u32 = bun.C.darwin.RemoveFileFlags.cross_mount |
-                    bun.C.darwin.RemoveFileFlags.allow_long_paths |
-                    bun.C.darwin.RemoveFileFlags.recursive;
+                const flags = bun.C.darwin.RemoveFileFlags{
+                    .cross_mount = true,
+                    .allow_long_paths = true,
+                    .recursive = true,
+                };
 
                 while (true) {
-                    if (Maybe(Return.Rmdir).errnoSys(bun.C.darwin.removefileat(std.os.AT.FDCWD, dest, null, flags), .rmdir)) |errno| {
+                    if (Maybe(Return.Rmdir).errnoSysP(bun.C.darwin.removefileat(std.os.AT.FDCWD, path, null, flags), .rmdir, path)) |errno| {
                         switch (@as(os.E, @enumFromInt(errno.err.errno))) {
                             .AGAIN, .INTR => continue,
                             .NOENT => return Maybe(Return.Rmdir).success,
                             .MLINK => {
                                 var copy: [bun.MAX_PATH_BYTES]u8 = undefined;
-                                @memcpy(copy[0..dest.len], dest);
-                                copy[dest.len] = 0;
-                                var dest_copy = copy[0..dest.len :0];
+                                @memcpy(copy[0..path.len], path);
+                                copy[path.len] = 0;
+                                var dest_copy = copy[0..path.len :0];
                                 switch (Syscall.unlink(dest_copy).getErrno()) {
                                     .AGAIN, .INTR => continue,
                                     .NOENT => return errno,
@@ -4658,17 +4660,16 @@ pub const NodeFS = struct {
         _ = flavor;
 
         if (comptime Environment.isMac) {
-            var dest = args.path.sliceZ(&this.sync_error_buf);
+            var path = args.path.sliceZ(&this.sync_error_buf);
 
             while (true) {
-                var flags: u32 = 0;
-                if (args.recursive) {
-                    flags |= bun.C.darwin.RemoveFileFlags.cross_mount;
-                    flags |= bun.C.darwin.RemoveFileFlags.allow_long_paths;
-                    flags |= bun.C.darwin.RemoveFileFlags.recursive;
-                }
+                var flags = bun.C.darwin.RemoveFileFlags{
+                    .recursive = args.recursive,
+                    .cross_mount = args.recursive,
+                    .allow_long_paths = args.recursive,
+                };
 
-                if (Maybe(Return.Rm).errnoSys(bun.C.darwin.removefileat(std.os.AT.FDCWD, dest, null, flags), .unlink)) |errno| {
+                if (Maybe(Return.Rm).errnoSysP(bun.C.darwin.removefileat(std.os.AT.FDCWD, path, null, flags), .unlink, path)) |errno| {
                     switch (@as(os.E, @enumFromInt(errno.err.errno))) {
                         .AGAIN, .INTR => continue,
                         .NOENT => {
@@ -4681,9 +4682,9 @@ pub const NodeFS = struct {
 
                         .MLINK => {
                             var copy: [bun.MAX_PATH_BYTES]u8 = undefined;
-                            @memcpy(copy[0..dest.len], dest);
-                            copy[dest.len] = 0;
-                            var dest_copy = copy[0..dest.len :0];
+                            @memcpy(copy[0..path.len], path);
+                            copy[path.len] = 0;
+                            var dest_copy = copy[0..path.len :0];
                             switch (Syscall.unlink(dest_copy).getErrno()) {
                                 .AGAIN, .INTR => continue,
                                 .NOENT => {
@@ -4743,6 +4744,8 @@ pub const NodeFS = struct {
                 return Maybe(Return.Rm).success;
             }
         }
+
+        // TODO: Audit these next two codepaths, they can probably be deleted.
 
         if (comptime Environment.isPosix) {
             var dest = args.path.osPath(&this.sync_error_buf);
